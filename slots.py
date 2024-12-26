@@ -1,58 +1,78 @@
+import os
 import requests
 import urllib3
 import re
 import json
-from datetime import datetime
-import time
-# from pushbullet import Pushbullet
-from pushbullet.pushbullet import Pushbullet
 
 # Disable SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+# Pushbullet API credentials
+ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
+PUSHBULLET_URL = 'https://api.pushbullet.com/v2/pushes'
+
 # Specify the URL
-url = 'https://oap.ind.nl/oap/api/desks/DH/slots?productKey=DOC&persons=1'
+TARGET_URL = 'https://oap.ind.nl/oap/api/desks/DH/slots?productKey=DOC&persons=1'
 
 # Specify headers
-headers = {
+TARGET_HEADERS = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'oap-locale': 'en'
 }
 
-# Push notification function
-def send_push_notification(title, body):
-    ACCESS_TOKEN = 'o.rKs9Caxjv8iiz30aIBPQvN9G58mpa7BC'
-    # pb = Pushbullet(ACCESS_TOKEN)
-    # push = pb.push_note(title, body)
-    pb = Pushbullet(api_key=ACCESS_TOKEN)
-    device_idn = pb.list_devices()["devices"][0]["iden"]
-    # device_idn = "ujBKmhnF0DYsjBLD0k1Uzc"
-    pb.bullet_note(device_idn, title, body)
 
-try:
-    # Send a GET request with headers and disable SSL verification
-    response = requests.get(url, headers=headers, verify=False)
-
-    # Check if the request was successful
+def send_notification(title, body):
+    headers = {
+        'Access-Token': ACCESS_TOKEN,
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'type': 'note',
+        'title': title,
+        'body': body
+    }
+    response = requests.post(PUSHBULLET_URL, json=payload, headers=headers)
     if response.status_code == 200:
-        try:
-            # Remove non-JSON prefix (e.g., )]}')
-            clean_response = re.sub(r'^\)\]\}\',', '', response.text)
-            json_data = json.loads(clean_response)
-
-            # Check the first date
-            firstDate = json_data["data"][0]["date"]
-            print(f"Running..")
-            if firstDate.startswith('2024'):
-                print('Response:', firstDate)
-                send_push_notification('Slot Available', f'A slot is available on {firstDate}.')
-
-        except (ValueError, json.JSONDecodeError) as e:
-            print('Failed to parse JSON. Raw content:', response.text)
+        print("Notification sent successfully!")
     else:
-        print('Failed to retrieve data. Status code:', response.status_code)
+        print("Failed to send notification:", response.text)
 
-except requests.exceptions.RequestException as e:
-    print('An error occurred:', e)
 
+def retrieve_first_date():
+    try:
+        response = requests.get(TARGET_URL, headers=TARGET_HEADERS, verify=False)
+
+        if response.status_code == 200:
+            try:
+                clean_response = re.sub(r'^\)\]\}\',', '', response.text) # Remove non-JSON prefix (e.g., )]}')
+                json_data = json.loads(clean_response)
+                firstDate = json_data["data"][0]["date"]
+                return firstDate
+            except (ValueError, json.JSONDecodeError) as e:
+                print('Failed to parse JSON. Raw content:', response.text)
+        else:
+            print('Failed to retrieve data. Status code:', response.status_code)
+
+        return ""
+    
+    except requests.exceptions.RequestException as e:
+        print('An error occurred:', e)
+
+
+def test():
+    title = "Test Notification"
+    body = "This is a test message from Pushbullet API."
+    send_notification(title, body)
+
+
+def main():
+    print("Running...")
+    first_date = retrieve_first_date()
+    if first_date.startswith('2024'):
+        print('Response:', first_date)
+        title = "Slot Available"
+        body = f'A slot is available on {first_date}.'
+        send_notification(title, body)
+
+main()
