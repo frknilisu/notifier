@@ -69,7 +69,7 @@ def test():
 def main():
     print("Running...")
     first_date = retrieve_first_date()
-    if first_date.startswith('2024'):
+    if first_date.startswith('2025'):
         print('Response:', first_date)
         title = "Slot Available"
         body = f'A slot is available on {first_date}.'
